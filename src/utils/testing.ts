@@ -5,8 +5,8 @@
  */
 
 import { UIUXValidator, type ValidationReport } from './validation';
-import { PerformanceMonitor } from './performance';
-import { AccessibilityManager } from './accessibility';
+import { performanceMonitor } from './performance';
+// import { AccessibilityManager } from './accessibility';
 
 // ===================================================================
 // AUTOMATED TESTING FRAMEWORK
@@ -147,7 +147,7 @@ export class InteractionTester {
       return {
         passed: false,
         responseTime: performance.now() - startTime,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: _error instanceof Error ? _error.message : 'Unknown error',
       };
     }
   }
@@ -439,7 +439,7 @@ export class QualityMonitor {
         this.generateMonitoringAlert(report);
       }
     } catch (_error) {
-      console.error('Monitoring cycle failed:', error);
+      console.error('Monitoring cycle failed:', _error);
     }
   }
 
@@ -641,7 +641,7 @@ export class TestRunner {
             name: `${suite.name}: ${test.name}`,
             passed: false,
             duration,
-            error: error instanceof Error ? error.message : 'Unknown error',
+            error: _error instanceof Error ? _error.message : 'Unknown error',
           });
         }
       }

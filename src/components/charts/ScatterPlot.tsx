@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from 'react';
+import { BulletproofSafety, SafeComponent } from '../../utils/bulletproofSafety';
+import { withErrorBoundary } from '../common/BulletproofErrorBoundary';
 
 export interface ScatterPoint {
   x: number;
@@ -26,37 +28,69 @@ const ScatterPlot: React.FC<ScatterPlotProps> = ({
   const [tooltip, setTooltip] = useState<{ x: number; y: number; point: ScatterPoint } | null>(
     null,
   );
+  
+  // Bulletproof data validation for scatter points
+  const safeData = useMemo(() => {
+    return BulletproofSafety.PerformanceMonitor.measureTime(
+      () => BulletproofSafety.safeArray(data || [], (item: any): item is ScatterPoint => {
+        return item &&
+               typeof item === 'object' &&
+               typeof item.x === 'number' &&
+               typeof item.y === 'number' &&
+               typeof item.label === 'string' &&
+               typeof item.color === 'string' &&
+               !isNaN(item.x) &&
+               !isNaN(item.y) &&
+               isFinite(item.x) &&
+               isFinite(item.y);
+      }).toArray(),
+      'ScatterPlot data validation'
+    );
+  }, [data]);
 
   const { xScale, yScale, points } = useMemo(() => {
-    if (!data || data.length === 0) {
-      return { xScale: () => 0, yScale: () => 0, points: [] };
-    }
+    return BulletproofSafety.SafeMath.calculate(() => {
+      if (safeData.length === 0) {
+        BulletproofSafety.logger.warn('ScatterPlot: No valid data points available');
+        return { xScale: () => 0, yScale: () => 0, points: [] };
+      }
 
-    // Filter out invalid data points and ensure valid coordinates
-    const validData = data.filter(d => d && typeof d.x === 'number' && typeof d.y === 'number' && !isNaN(d.x) && !isNaN(d.y));
-    
-    if (validData.length === 0) {
-      return { xScale: () => 0, yScale: () => 0, points: [] };
-    }
+      // Extract coordinates safely
+      const xCoordinates = BulletproofSafety.safeArray(safeData)
+        .map(d => BulletproofSafety.safeNumber(d.x).value)
+        .toArray();
+      const yCoordinates = BulletproofSafety.safeArray(safeData)
+        .map(d => BulletproofSafety.safeNumber(d.y).value)
+        .toArray();
 
-    const xCoordinates = validData.map(d => d.x);
-    const yCoordinates = validData.map(d => d.y);
-    const xMin = Math.min(...xCoordinates, 0);
-    const xMax = Math.max(...xCoordinates);
-    const yMin = Math.min(...yCoordinates, 0);
-    const yMax = Math.max(...yCoordinates);
+      // Safe min/max calculations with 0-inclusive behavior
+      const xMin = BulletproofSafety.SafeMath.min([...xCoordinates, 0], 0);
+      const xMax = BulletproofSafety.SafeMath.max(xCoordinates, 100);
+      const yMin = BulletproofSafety.SafeMath.min([...yCoordinates, 0], 0);
+      const yMax = BulletproofSafety.SafeMath.max(yCoordinates, 100);
 
-    const xScale = (x: number) =>
-      padding.left + ((x - xMin) / (xMax - xMin || 1)) * (width - padding.left - padding.right);
-    const yScale = (y: number) =>
-      height -
-      padding.bottom -
-      ((y - yMin) / (yMax - yMin || 1)) * (height - padding.top - padding.bottom);
+      // Create safe scale functions
+      const xScale = BulletproofSafety.ChartSafety.createSafeScale(
+        [xMin, xMax], 
+        [padding.left, width - padding.right]
+      );
+      const yScale = BulletproofSafety.ChartSafety.createSafeScale(
+        [yMin, yMax], 
+        [height - padding.bottom, padding.top]
+      );
 
-    const points = validData.map(d => ({ ...d, cx: xScale(d.x), cy: yScale(d.y) }));
+      // Generate safe points with screen coordinates
+      const points = BulletproofSafety.safeArray(safeData)
+        .map(d => ({
+          ...d,
+          cx: xScale(d.x),
+          cy: yScale(d.y)
+        }))
+        .toArray();
 
-    return { xScale, yScale, points };
-  }, [data, width, height, padding]);
+      return { xScale, yScale, points };
+    }, { xScale: () => 0, yScale: () => 0, points: [] }, 'ScatterPlot scale calculation').value;
+  }, [safeData, width, height, padding]);
 
   const axisTicks = useMemo(() => {
     if (!data || data.length === 0) {
@@ -209,4 +243,10 @@ const ScatterPlot: React.FC<ScatterPlotProps> = ({
   );
 };
 
-export default ScatterPlot;
+// Export with error boundary protection
+export default withErrorBoundary(ScatterPlot, {
+  context: 'ScatterPlot',
+  showErrorDetails: process.env.NODE_ENV === 'development',
+  maxRetries: 2,
+  autoRetry: true
+});

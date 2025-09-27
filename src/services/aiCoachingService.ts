@@ -1,6 +1,8 @@
 import { type Formation, type Player } from '../types';
 import { openAiService } from './openAiService';
 import { tacticalIntegrationService } from './tacticalIntegrationService';
+import { BulletproofSafety } from '../utils/bulletproofSafety';
+import { isValidFormation, isValidPlayer, getFormationSlots } from '../utils/tacticalDataGuards';
 
 interface CoachingRecommendation {
   id: string;
@@ -66,37 +68,62 @@ class AICoachingService {
       opposition?: Formation;
     },
   ): Promise<CoachingRecommendation[]> {
-    try {
+    return BulletproofSafety.ErrorBoundaryHelpers.safeAsync(async () => {
+      if (!isValidFormation(formation)) {
+        BulletproofSafety.logger.warn('AICoachingService: Invalid formation provided');
+        return this.getFallbackRecommendations(formation, players);
+      }
+
+      const validPlayers = BulletproofSafety.DataValidators.validatePlayerData(players);
+      if (validPlayers.length === 0) {
+        BulletproofSafety.logger.warn('AICoachingService: No valid players provided');
+        return this.getFallbackRecommendations(formation, players);
+      }
+
       const recommendations: CoachingRecommendation[] = [];
 
-      // Analyze formation structure
-      const formationAnalysis = await this.analyzeFormationStructure(formation, players);
+      // Analyze formation structure with safety
+      const formationAnalysis = await BulletproofSafety.ErrorBoundaryHelpers.safeAsync(
+        () => this.analyzeFormationStructure(formation, validPlayers),
+        [],
+        'Formation structure analysis'
+      );
       recommendations.push(...formationAnalysis);
 
-      // Analyze player positioning
-      const playerAnalysis = await this.analyzePlayerPositioning(formation, players);
+      // Analyze player positioning with safety
+      const playerAnalysis = await BulletproofSafety.ErrorBoundaryHelpers.safeAsync(
+        () => this.analyzePlayerPositioning(formation, validPlayers),
+        [],
+        'Player positioning analysis'
+      );
       recommendations.push(...playerAnalysis);
 
-      // Generate tactical recommendations
-      const tacticalRecommendations = await this.generateTacticalAdvice(formation, players, context);
+      // Generate tactical recommendations with safety
+      const tacticalRecommendations = await BulletproofSafety.ErrorBoundaryHelpers.safeAsync(
+        () => this.generateTacticalAdvice(formation, validPlayers, context),
+        [],
+        'Tactical advice generation'
+      );
       recommendations.push(...tacticalRecommendations);
 
-      // AI-powered recommendations
-      const aiRecommendations = await this.getAIRecommendations(formation, players, context);
+      // AI-powered recommendations with safety
+      const aiRecommendations = await BulletproofSafety.ErrorBoundaryHelpers.safeAsync(
+        () => this.getAIRecommendations(formation, validPlayers, context),
+        [],
+        'AI recommendations generation'
+      );
       recommendations.push(...aiRecommendations);
 
-      // Sort by priority and confidence
-      return recommendations.sort((a, b) => {
-        const priorityOrder = { critical: 4, high: 3, medium: 2, low: 1 };
-        const priorityDiff = priorityOrder[b.priority] - priorityOrder[a.priority];
-        if (priorityDiff !== 0) {return priorityDiff;}
-        return b.confidence - a.confidence;
-      });
-
-    } catch (error) {
-      console.error('Failed to generate coaching recommendations:', error);
-      return this.getFallbackRecommendations(formation, players);
-    }
+      // Safe sorting with priority order
+      return BulletproofSafety.safeArray(recommendations)
+        .toArray()
+        .sort((a, b) => {
+          const priorityOrder = { critical: 4, high: 3, medium: 2, low: 1 };
+          const priorityDiff = (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0);
+          if (priorityDiff !== 0) { return priorityDiff; }
+          return BulletproofSafety.safeNumber(b.confidence, 0).value - BulletproofSafety.safeNumber(a.confidence, 0).value;
+        });
+    }, this.getFallbackRecommendations(formation, players), 'AICoachingService generateCoachingRecommendations');
   }
 
   /**

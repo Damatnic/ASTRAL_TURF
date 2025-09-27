@@ -48,7 +48,7 @@ export default defineConfig(({ mode }) => {
           return false;
         },
         output: {
-          manualChunks: id => {
+          manualChunks: (id: string) => {
             // Vendor libraries - split into smaller chunks
             if (id.includes('node_modules')) {
               // OpenAI - large external library
@@ -155,6 +155,9 @@ export default defineConfig(({ mode }) => {
             if (id.includes('src/components/field/') || id.includes('src/components/tactics/')) {
               return 'tactical';
             }
+            
+            // Default chunk for remaining code
+            return 'main';
           },
         },
       },

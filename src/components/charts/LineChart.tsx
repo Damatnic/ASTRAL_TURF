@@ -1,4 +1,6 @@
 import React, { useMemo } from 'react';
+import { BulletproofSafety, SafeComponent } from '../../utils/bulletproofSafety';
+import { withErrorBoundary } from '../common/BulletproofErrorBoundary';
 
 interface LineChartProps {
   data: { x: number; y: number }[];
@@ -18,95 +20,117 @@ const LineChart: React.FC<LineChartProps> = ({
   xAxisLabel = 'Week',
 }) => {
   const padding = useMemo(() => ({ top: 20, right: 20, bottom: 40, left: 40 }), []);
+  
+  // Bulletproof data validation
+  const safeData = useMemo(() => {
+    return BulletproofSafety.PerformanceMonitor.measureTime(
+      () => BulletproofSafety.DataValidators.validateChartData(data || []),
+      'LineChart data validation'
+    );
+  }, [data]);
 
   const { xScale, yScale, path, points } = useMemo(() => {
-    if (!data || data.length === 0) {
-      return { xScale: () => 0, yScale: () => 0, path: '', points: [] };
-    }
+    return BulletproofSafety.SafeMath.calculate(() => {
+      if (safeData.length === 0) {
+        BulletproofSafety.logger.warn('LineChart: No valid data points available');
+        return { xScale: () => 0, yScale: () => 0, path: '', points: [] };
+      }
 
-    // Filter out invalid data points and ensure valid coordinates
-    const validData = data.filter(d => d && typeof d.x === 'number' && typeof d.y === 'number' && !isNaN(d.x) && !isNaN(d.y));
-    
-    if (validData.length === 0) {
-      return { xScale: () => 0, yScale: () => 0, path: '', points: [] };
-    }
+      // Extract coordinates safely
+      const xCoordinates = BulletproofSafety.safeArray(safeData)
+        .map(d => BulletproofSafety.safeNumber(d.x).value)
+        .toArray();
+      const yCoordinates = BulletproofSafety.safeArray(safeData)
+        .map(d => BulletproofSafety.safeNumber(d.y).value)
+        .toArray();
 
-    const xCoordinates = validData.map(d => d.x);
-    const yCoordinates = validData.map(d => d.y);
-    const xMin = Math.min(...xCoordinates);
-    const xMax = Math.max(...xCoordinates);
-    const yMin = Math.min(...yCoordinates);
-    const yMax = Math.max(...yCoordinates);
+      // Safe min/max calculations
+      const xMin = BulletproofSafety.SafeMath.min(xCoordinates, 0);
+      const xMax = BulletproofSafety.SafeMath.max(xCoordinates, 100);
+      const yMin = BulletproofSafety.SafeMath.min(yCoordinates, 0);
+      const yMax = BulletproofSafety.SafeMath.max(yCoordinates, 100);
 
-    const xScale = (x: number) =>
-      padding.left + ((x - xMin) / (xMax - xMin || 1)) * (width - padding.left - padding.right);
-    const yScale = (y: number) =>
-      height -
-      padding.bottom -
-      ((y - yMin) / (yMax - yMin || 1)) * (height - padding.top - padding.bottom);
+      // Create safe scale functions
+      const xScale = BulletproofSafety.ChartSafety.createSafeScale(
+        [xMin, xMax], 
+        [padding.left, width - padding.right]
+      );
+      const yScale = BulletproofSafety.ChartSafety.createSafeScale(
+        [yMin, yMax], 
+        [height - padding.bottom, padding.top]
+      );
 
-    const path = validData
-      .map((d, i) => `${i === 0 ? 'M' : 'L'} ${xScale(d.x)} ${yScale(d.y)}`)
-      .join(' ');
+      // Generate safe path
+      const path = BulletproofSafety.ChartSafety.createSafePath(
+        safeData.map(d => ({ x: xScale(d.x), y: yScale(d.y) }))
+      );
 
-    const points = validData.map(d => ({
-      x: xScale(d.x),
-      y: yScale(d.y),
-      originalX: d.x,
-      originalY: d.y,
-    }));
+      // Generate safe points
+      const points = BulletproofSafety.safeArray(safeData)
+        .map(d => ({
+          x: xScale(d.x),
+          y: yScale(d.y),
+          originalX: d.x,
+          originalY: d.y,
+        }))
+        .toArray();
 
-    return { xScale, yScale, path, points };
-  }, [data, width, height, padding]);
+      return { xScale, yScale, path, points };
+    }, { xScale: () => 0, yScale: () => 0, path: '', points: [] }, 'LineChart scale calculation').value;
+  }, [safeData, width, height, padding]);
 
   const yAxisTicks = useMemo(() => {
-    if (!data || data.length === 0) {
-      return [];
-    }
-    
-    // Filter out invalid data points and ensure valid coordinates
-    const validData = data.filter(d => d && typeof d.x === 'number' && typeof d.y === 'number' && !isNaN(d.x) && !isNaN(d.y));
-    
-    if (validData.length === 0) {
-      return [];
-    }
-    
-    const yCoordinates = validData.map(d => d.y);
-    const yMin = Math.min(...yCoordinates);
-    const yMax = Math.max(...yCoordinates);
-    const ticks = [];
-    for (let i = 0; i <= 4; i++) {
-      const value = Math.round(yMin + (i / 4) * (yMax - yMin));
-      ticks.push({ value, y: yScale(value) });
-    }
-    return ticks;
-  }, [data, yScale]);
+    return BulletproofSafety.SafeMath.calculate(() => {
+      if (safeData.length === 0) {
+        return [];
+      }
+      
+      const yCoordinates = BulletproofSafety.safeArray(safeData)
+        .map(d => BulletproofSafety.safeNumber(d.y).value)
+        .toArray();
+      
+      const yMin = BulletproofSafety.SafeMath.min(yCoordinates, 0);
+      const yMax = BulletproofSafety.SafeMath.max(yCoordinates, 100);
+      
+      const tickValues = BulletproofSafety.ChartSafety.generateSafeTicks(yMin, yMax, 5);
+      
+      return tickValues.map(value => ({
+        value: Math.round(value),
+        y: yScale(value)
+      }));
+    }, [], 'LineChart Y-axis ticks').value;
+  }, [safeData, yScale]);
 
   const xAxisTicks = useMemo(() => {
-    if (!data || data.length === 0) {
-      return [];
-    }
-    
-    // Filter out invalid data points and ensure valid coordinates
-    const validData = data.filter(d => d && typeof d.x === 'number' && typeof d.y === 'number' && !isNaN(d.x) && !isNaN(d.y));
-    
-    if (validData.length === 0) {
-      return [];
-    }
-    
-    const xValues = validData.map(d => d.x);
-    const uniqueX = [...new Set(xValues)];
-    return uniqueX.map(val => ({ value: val, x: xScale(val) }));
-  }, [data, xScale]);
+    return BulletproofSafety.SafeMath.calculate(() => {
+      if (safeData.length === 0) {
+        return [];
+      }
+      
+      const xValues = BulletproofSafety.safeArray(safeData)
+        .map(d => BulletproofSafety.safeNumber(d.x).value)
+        .toArray();
+      
+      const uniqueX = [...new Set(xValues)].sort((a, b) => a - b);
+      
+      return uniqueX.map(val => ({
+        value: val,
+        x: xScale(val)
+      }));
+    }, [], 'LineChart X-axis ticks').value;
+  }, [safeData, xScale]);
 
-  if (!data || data.length < 2) {
+  // Safe rendering with fallback
+  if (safeData.length < 2) {
     return (
-      <div
-        style={{ width, height }}
-        className="flex items-center justify-center text-sm text-gray-500 bg-gray-700/30 rounded-md"
-      >
-        Not enough data to display chart. Needs at least 2 weeks of history.
-      </div>
+      <SafeComponent context="LineChart Fallback">
+        <div
+          style={{ width: BulletproofSafety.safeNumber(width, 500).value, height: BulletproofSafety.safeNumber(height, 250).value }}
+          className="flex items-center justify-center text-sm text-gray-500 bg-gray-700/30 rounded-md"
+        >
+          Not enough data to display chart. Needs at least 2 valid data points.
+        </div>
+      </SafeComponent>
     );
   }
 
@@ -181,4 +205,10 @@ const LineChart: React.FC<LineChartProps> = ({
   );
 };
 
-export default LineChart;
+// Export with error boundary protection
+export default withErrorBoundary(LineChart, {
+  context: 'LineChart',
+  showErrorDetails: process.env.NODE_ENV === 'development',
+  maxRetries: 2,
+  autoRetry: true
+});

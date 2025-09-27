@@ -2,24 +2,29 @@
 import { vi } from 'vitest';
 
 // Mock Chart class
+const mockChartClass = vi.fn().mockImplementation(() => ({
+  render: vi.fn(),
+  update: vi.fn(),
+  destroy: vi.fn(),
+  reset: vi.fn(),
+  stop: vi.fn(),
+  resize: vi.fn(),
+  clear: vi.fn(),
+  toBase64Image: vi.fn(),
+  generateLegend: vi.fn(),
+  getElementAtEvent: vi.fn(),
+  getElementsAtEvent: vi.fn(),
+  getElementsAtXAxis: vi.fn(),
+  getElementsAtEventForMode: vi.fn(),
+  getDatasetAtEvent: vi.fn(),
+}));
+
+// Add register as a static method
+(mockChartClass as any).register = vi.fn();
+
 const mockChart = {
   register: vi.fn(),
-  Chart: vi.fn().mockImplementation(() => ({
-    render: vi.fn(),
-    update: vi.fn(),
-    destroy: vi.fn(),
-    reset: vi.fn(),
-    stop: vi.fn(),
-    resize: vi.fn(),
-    clear: vi.fn(),
-    toBase64Image: vi.fn(),
-    generateLegend: vi.fn(),
-    getElementAtEvent: vi.fn(),
-    getElementsAtEvent: vi.fn(),
-    getElementsAtXAxis: vi.fn(),
-    getElementsAtEventForMode: vi.fn(),
-    getDatasetAtEvent: vi.fn(),
-  })),
+  Chart: mockChartClass,
   defaults: {
     global: {
       responsive: true,
@@ -43,6 +48,6 @@ export const Legend = vi.fn();
 export const Filler = vi.fn();
 
 // Mock register function
-Chart.register = mockChart.register;
+(Chart as any).register = mockChart.register;
 
 export default mockChart;

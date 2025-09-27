@@ -5,6 +5,8 @@
  * accessibility features, and user preferences.
  */
 
+import React from 'react';
+
 export type ThemeMode = 'light' | 'dark' | 'auto' | 'high-contrast' | 'custom';
 export type ColorScheme = 'blue' | 'green' | 'purple' | 'orange' | 'football';
 

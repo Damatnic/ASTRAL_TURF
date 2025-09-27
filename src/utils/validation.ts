@@ -4,7 +4,7 @@
  * Ensures WCAG 2.1 AAA compliance and perfect Lighthouse scores
  */
 
-import { PerformanceMonitor, type PerformanceMetrics } from './performance';
+import { performanceMonitor, type PerformanceMetrics } from './performance';
 
 // ===================================================================
 // LIGHTHOUSE VALIDATION

@@ -18,6 +18,9 @@ import {
   Settings
 } from 'lucide-react';
 import type { Player, Position } from '../../types';
+import { BulletproofSafety, SafeComponent } from '../../utils/bulletproofSafety';
+import { withErrorBoundary } from '../common/BulletproofErrorBoundary';
+import { isValidPlayer, isValidPosition, getPlayerPosition } from '../../utils/tacticalDataGuards';
 
 interface TouchGesture {
   type: 'tap' | 'double-tap' | 'long-press' | 'pinch' | 'pan' | 'swipe';
@@ -44,7 +47,7 @@ interface TouchFirstTacticsBoardProps {
   isReadOnly?: boolean;
 }
 
-export const TouchFirstTacticsBoard: React.FC<TouchFirstTacticsBoardProps> = ({
+const TouchFirstTacticsBoard: React.FC<TouchFirstTacticsBoardProps> = ({
   players,
   onPlayerMove,
   onFormationChange,
@@ -520,3 +523,14 @@ export const TouchFirstTacticsBoard: React.FC<TouchFirstTacticsBoardProps> = ({
     </div>
   );
 };
+
+// Export with error boundary protection
+export const SafeTouchFirstTacticsBoard = withErrorBoundary(TouchFirstTacticsBoard, {
+  context: 'TouchFirstTacticsBoard',
+  showErrorDetails: process.env.NODE_ENV === 'development',
+  maxRetries: 1,
+  autoRetry: false,
+  criticalError: true
+});
+
+export { SafeTouchFirstTacticsBoard as TouchFirstTacticsBoard };
